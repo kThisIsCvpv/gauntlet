@@ -1,9 +1,7 @@
-# RuneLite Gauntlet Plugin (Last Updated: 2019 July 27)
-##### Made by: Yuri-chan (Nagi#0001)
-#
-**Disclaimer:**
-I'm only 5 hours into this boss with 2 normal kc and 6 corrupted kc. 
-More features will be added as they become relevant.
+# RuneLite Gauntlet Plugin
+**Author:** Yuri-chan (Nagi#0001)
+**Last Updated:** July 27, 2019
+**Disclaimer:** I'm only 5 hours into this boss with 2 normal kc and 6 corrupted kc. More features will be added as they become relevant.
 
 ## Settings and Features:
 ![alt text](https://www.kthisiscvpv.com/jmeE91564311006SAwWl.png)
