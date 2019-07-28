@@ -3,7 +3,7 @@
 
 **Last Updated:** July 27, 2019
 
-**Disclaimer:** I'm only 5 hours into this boss with 2 normal kc and 6 corrupted kc. More features will be added as they become relevant.
+**Disclaimer:** I'm only 5 hours into this boss with 2 normal kc and 6 corrupted kc. More features will be added as they become relevant. You will need to compile the classes yourself if you want to use the project.
 
 ## Settings and Features:
 ![alt text](https://www.kthisiscvpv.com/jmeE91564311006SAwWl.png)
@@ -15,12 +15,14 @@ Resource deposits in each room will be highlighted in yellow.
 
 ## Highlight Icons: 
 Resource deposits in each room will be highlighted in yellow.
+
 **Warning:** This setting depends on __Highlight Resources__ being turned __ON__.
 
 ![alt text](https://www.kthisiscvpv.com/tYCOE1564311216ylXbk.png)
 
 ## Count Player Attacks: 
 Count the amount of player attacks left until the boss changes their prayer.
+
 **Warning:** This setting depends on __Boss Attacks__ being turned __ON__.
 
 ## Count Boss Attacks: 
@@ -43,6 +45,7 @@ Overlay the boss entirely with a color coded style reference.
 
 ## Play Tune on Prayer Attack: 
 Play a quick tune when the prayer attack is being sent.
+
 **Warning:** This setting will override your in-game sound settings.
 
 ``client.playSoundEffect(SoundEffectID.MAGIC_SPLASH_BOING, SoundEffectVolume.MEDIUM_HIGH);``
