@@ -5,6 +5,8 @@
 
 **Disclaimer:** I'm only 5 hours into this boss with 2 normal kc and 6 corrupted kc. More features will be added as they become relevant. You will need to compile the classes yourself if you want to use the project.
 
+**License:** WTFPL (https://en.wikipedia.org/wiki/WTFPL) - Everyone is permitted to copy and distribute.
+
 ## Settings and Features:
 ![alt text](https://www.kthisiscvpv.com/jmeE91564311006SAwWl.png)
 
