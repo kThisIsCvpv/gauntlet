@@ -16,6 +16,7 @@ import net.runelite.api.Projectile;
 import net.runelite.api.Tile;
 import net.runelite.api.TileObject;
 import net.runelite.api.coords.LocalPoint;
+import net.runelite.api.coords.WorldPoint;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPosition;
@@ -47,169 +48,190 @@ public class GauntletOverlay extends Overlay {
 
     @Override
     public Dimension render(Graphics2D graphics) {
-        if (this.plugin.inBoss()) {
-            if (config.showAttackStyle()) {
-                for (Projectile projectile : this.client.getProjectiles()) {
-                    BufferedImage icon;
-                    switch (projectile.getId()) {
-                        case 1707:
-                        case 1708:
-                            icon = plugin.getATTACK_MAGE();
-                            break;
-                        case 1711:
-                        case 1712:
-                            icon = plugin.getATTACK_RANGE();
-                            break;
-                        case 1713:
-                        case 1714:
-                            icon = plugin.getATTACK_PRAYER();
-                            break;
-                        default:
-                            icon = null;
-                            break;
-                    }
+        // Save resources. There's nothing to render if the user is not in a raid.
+        if (!GauntletUtils.inRaid(client))
+            return null;
 
-                    if (icon == null)
-                        continue;
+        if (GauntletUtils.inBoss(client)) { // This section handles the visuals when the player is in the boss room.
+            // This section handles the projectile overlays.
+            for (Projectile projectile : this.client.getProjectiles()) {
+                int id = projectile.getId();
 
-                    int x = (int) projectile.getX();
-                    int y = (int) projectile.getY();
+                BufferedImage icon = null;
 
-                    LocalPoint point = new LocalPoint(x, y);
-                    Point loc = Perspective.getCanvasImageLocation(client, point, icon, 0);
+                if (GauntletUtils.arrayContainsInteger(GauntletUtils.PROJECTILE_MAGIC, id) && config.uniqueAttackVisual())
+                    icon = plugin.imageAttackMage;
+                else if (GauntletUtils.arrayContainsInteger(GauntletUtils.PROJECTILE_RANGE, id) && config.uniqueAttackVisual())
+                    icon = plugin.imageAttackRange;
+                else if (GauntletUtils.arrayContainsInteger(GauntletUtils.PROJECTILE_PRAYER, id) && config.uniquePrayerVisual())
+                    icon = plugin.imageAttackPrayer;
 
-                    if (loc == null)
-                        continue;
+                if (icon == null)
+                    continue;
 
-                    graphics.drawImage(icon, loc.getX(), loc.getY(), null);
-                }
-            }
+                int x = (int) projectile.getX();
+                int y = (int) projectile.getY();
 
-            BufferedImage attackIcon = null;
-            if (config.countBossAttacks()) {
-                switch (plugin.getCurrentStyle()) {
-                    case MAGIC:
-                        attackIcon = plugin.getATTACK_MAGE();
-                        break;
-                    case RANGE:
-                        attackIcon = plugin.getATTACK_RANGE();
-                        break;
-                    default:
-                        attackIcon = plugin.getATTACK_PRAYER();
-                        break;
-                }
+                LocalPoint point = new LocalPoint(x, y);
+                Point loc = Perspective.getCanvasImageLocation(client, point, icon, 0);
+
+                if (loc == null)
+                    continue;
+
+                graphics.drawImage(icon, loc.getX(), loc.getY(), null);
             }
 
             for (NPC npc : this.client.getNpcs()) {
-                String name = npc.getName();
-                if (name == null || !npc.getName().matches("(Crystalline|Corrupted) Hunllef"))
-                    continue;
+                // Draws graphics on tornadoes.
+                if (config.overlayTornadoes() && plugin.tornadoesActive && GauntletUtils.isTornado(npc)) {
+                    String textOverlay = Integer.toString(plugin.tornadoTicks);
 
-                if (config.overlayBoss()) {
-                    Polygon polygon = npc.getConvexHull();
-
-                    if (polygon != null) {
-                        Color color;
-                        switch (plugin.getCurrentStyle()) {
-                            case MAGIC:
-                                color = Color.CYAN;
-                                break;
-                            case RANGE:
-                                color = Color.GREEN;
-                                break;
-                            default:
-                                color = Color.WHITE;
-                                break;
-                        }
-
-                        graphics.draw(polygon);
-                        graphics.setColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), 50));
-                        graphics.fill(polygon);
-                    }
-                }
-
-                if (attackIcon != null) {
-                    LocalPoint point = npc.getLocalLocation();
-                    Point imageLoc = Perspective.getCanvasImageLocation(client, point, attackIcon, npc.getLogicalHeight() / 2);
-
-                    if (imageLoc == null)
-                        continue;
-
-                    graphics.drawImage(attackIcon, imageLoc.getX(), imageLoc.getY(), null);
-
-                    String message = Integer.toString(plugin.getAttacksLeft());
-                    if (config.countPlayerAttacks()) {
-                        message += " | " + plugin.getPlayerCounter();
-                    }
-
-                    Point textLoc = Perspective.getCanvasTextLocation(client, graphics, point, message, npc.getLogicalHeight() / 2);
+                    Point textLoc = Perspective.getCanvasTextLocation(client, graphics, npc.getLocalLocation(), textOverlay, 0);
 
                     if (textLoc == null)
                         continue;
-
-                    textLoc = new Point(textLoc.getX(), textLoc.getY() + 35);
 
                     Font oldFont = graphics.getFont();
 
                     graphics.setFont(new Font("Arial", Font.BOLD, 20));
                     Point pointShadow = new Point(textLoc.getX() + 1, textLoc.getY() + 1);
 
-                    OverlayUtil.renderTextLocation(graphics, pointShadow, message, Color.BLACK);
-                    OverlayUtil.renderTextLocation(graphics, textLoc, message, Color.CYAN);
+                    OverlayUtil.renderTextLocation(graphics, pointShadow, textOverlay, Color.BLACK);
+                    OverlayUtil.renderTextLocation(graphics, textLoc, textOverlay, Color.YELLOW);
 
                     graphics.setFont(oldFont);
                 }
-            }
-        } else {
-            if (config.highlightResources()) {
-                LocalPoint playerLocation = client.getLocalPlayer().getLocalLocation();
-                Point mousePosition = client.getMouseCanvasPosition();
 
-                for (TileObject object : plugin.getResources().keySet()) {
-                    Tile tile = plugin.getResources().get(object);
-                    if (tile.getPlane() == client.getPlane()
-                            && object.getLocalLocation().distanceTo(playerLocation) < MAX_DISTANCE) {
-//                        Area objectClickbox = object.getClickbox(); // Don't use Convex Hull; you'll lag.
+                // Draws the graphics on the boss.
+                if (GauntletUtils.isBoss(npc)) {
 
-                        Polygon polygon = object.getCanvasTilePoly();
+                    final LocalPoint point = npc.getLocalLocation();
+
+                    // Overlay the boss with a color on it's convex hull.
+                    if (config.overlayBoss()) {
+                        Polygon polygon = npc.getConvexHull();
+
                         if (polygon != null) {
-                            Color color = SystemColor.YELLOW;
-                            BufferedImage icon;
-
-                            if (config.highlightResourcesIcons())
-                                switch (object.getId()) {
-                                    case 36064: // Crystal Deposit
-                                    case 35967:
-                                        icon = plugin.getCRYSTAL_DEPOSIT();
-                                        break;
-                                    case 36066: // Phren Roots
-                                    case 35969:
-                                        icon = plugin.getPHREN_ROOTS();
-                                        break;
-                                    case 36068: // Fishing Spot
-                                    case 35971:
-                                        icon = plugin.getFISHING_SPOT();
-                                        break;
-                                    case 36070: // Grym Root
-                                    case 35973:
-                                        icon = plugin.getGRYM_ROOT();
-                                        break;
-                                    case 36072: // Linum Tirinum
-                                    case 35975:
-                                        icon = plugin.getLINUM_TIRINUM();
-                                        break;
-                                    default:
-                                        icon = null;
-                                        break;
-                                }
-                            else
-                                icon = null;
-
-                            graphics.setColor(color);
+                            Color color;
+                            switch (plugin.currentPhase) {
+                                case MAGIC:
+                                    color = Color.CYAN;
+                                    break;
+                                case RANGE:
+                                    color = Color.GREEN;
+                                    break;
+                                default:
+                                    color = Color.WHITE;
+                                    break;
+                            }
 
                             graphics.draw(polygon);
                             graphics.setColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), 50));
                             graphics.fill(polygon);
+                        }
+                    }
+
+                    // Overlay of the boss with an icon denoting it's current attack style.
+                    if (config.overlayBossPrayer()) {
+                        BufferedImage attackIcon = null;
+
+                        switch (plugin.currentPhase) {
+                            case MAGIC:
+                                attackIcon = plugin.imageAttackMage;
+                                break;
+                            case RANGE:
+                                attackIcon = plugin.imageAttackRange;
+                                break;
+                            default:
+                                attackIcon = null;
+                                break;
+                        }
+
+                        if (attackIcon != null) {
+                            Point imageLoc = Perspective.getCanvasImageLocation(client, point, attackIcon, npc.getLogicalHeight() / 2);
+
+                            if (imageLoc == null)
+                                continue;
+
+                            graphics.drawImage(attackIcon, imageLoc.getX(), imageLoc.getY(), null);
+                        }
+                    }
+
+                    // This section handles any text overlays.
+                    String textOverlay = new String();
+
+                    // Handles the counter for the boss.
+                    if (config.countBossAttacks()) {
+                        textOverlay = Integer.toString(plugin.bossCounter);
+                    }
+
+                    // Handles the counter for the player.
+                    if (config.countPlayerAttacks()) {
+                        if (textOverlay.length() > 0)
+                            textOverlay += " | ";
+                        textOverlay += Integer.toString(plugin.playerCounter);
+                    }
+
+                    // Handles drawing the text onto the boss.
+                    if (textOverlay.length() > 0) {
+                        Point textLoc = Perspective.getCanvasTextLocation(client, graphics, point, textOverlay, npc.getLogicalHeight() / 2);
+
+                        if (textLoc == null)
+                            continue;
+
+                        textLoc = new Point(textLoc.getX(), textLoc.getY() + 35);
+
+                        Font oldFont = graphics.getFont();
+
+                        graphics.setFont(new Font("Arial", Font.BOLD, 20));
+                        Point pointShadow = new Point(textLoc.getX() + 1, textLoc.getY() + 1);
+
+                        OverlayUtil.renderTextLocation(graphics, pointShadow, textOverlay, Color.BLACK);
+                        OverlayUtil.renderTextLocation(graphics, textLoc, textOverlay, Color.CYAN);
+
+                        graphics.setFont(oldFont);
+                    }
+                }
+            }
+        } else {
+            // This section overlays all resources.
+            LocalPoint playerLocation = client.getLocalPlayer().getLocalLocation();
+
+            for (TileObject object : plugin.resources.keySet()) {
+                Tile tile = plugin.resources.get(object);
+                if (tile.getPlane() == client.getPlane()
+                        && object.getLocalLocation().distanceTo(playerLocation) < MAX_DISTANCE) {
+
+                    // Don't use Convex Hull Clickbox. As the room start to fill up, your FPS will dip.
+                    Polygon polygon = object.getCanvasTilePoly();
+
+                    if (polygon != null) {
+                        // This section will highlight the resource with color.
+                        if (config.highlightResourcesColor()) {
+                            Color color = SystemColor.YELLOW;
+
+                            graphics.setColor(color);
+                            graphics.draw(polygon);
+                            graphics.setColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), 50));
+                            graphics.fill(polygon);
+                        }
+
+                        // This section will overlay the resource with an icon.
+                        if (config.highlightResourcesIcons()) {
+                            int id = object.getId();
+                            BufferedImage icon = null;
+
+                            if (GauntletUtils.arrayContainsInteger(GauntletUtils.CRYSTAL_DEPOSIT, id)) {
+                                icon = plugin.imageCrystalDeposit;
+                            } else if (GauntletUtils.arrayContainsInteger(GauntletUtils.PHREN_ROOTS, id)) {
+                                icon = plugin.imagePhrenRoots;
+                            } else if (GauntletUtils.arrayContainsInteger(GauntletUtils.FISHING_SPOTS, id)) {
+                                icon = plugin.imageFishingSpot;
+                            } else if (GauntletUtils.arrayContainsInteger(GauntletUtils.GRYM_ROOTS, id)) {
+                                icon = plugin.imageGrymRoot;
+                            } else if (GauntletUtils.arrayContainsInteger(GauntletUtils.LINUM_TIRINUM, id)) {
+                                icon = plugin.imageLinumTirinum;
+                            }
 
                             if (icon != null) {
                                 Rectangle bounds = polygon.getBounds();

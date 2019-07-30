@@ -11,38 +11,31 @@ package net.runelite.client.plugins.gauntlet;
 import com.google.inject.Provides;
 import lombok.AccessLevel;
 import lombok.Getter;
-import lombok.Setter;
 import net.runelite.api.Actor;
 import net.runelite.api.Client;
+import net.runelite.api.GameObject;
 import net.runelite.api.GameState;
 import net.runelite.api.HeadIcon;
 import net.runelite.api.NPC;
 import net.runelite.api.NPCComposition;
 import net.runelite.api.Player;
 import net.runelite.api.Projectile;
+import net.runelite.api.Skill;
 import net.runelite.api.SoundEffectID;
-import net.runelite.api.SoundEffectVolume;
 import net.runelite.api.Tile;
-import net.runelite.api.TileObject;
 import net.runelite.api.events.AnimationChanged;
-import net.runelite.api.events.DecorativeObjectChanged;
-import net.runelite.api.events.DecorativeObjectDespawned;
-import net.runelite.api.events.DecorativeObjectSpawned;
+import net.runelite.api.events.ConfigChanged;
 import net.runelite.api.events.GameObjectChanged;
 import net.runelite.api.events.GameObjectDespawned;
 import net.runelite.api.events.GameObjectSpawned;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
-import net.runelite.api.events.GroundObjectChanged;
-import net.runelite.api.events.GroundObjectDespawned;
-import net.runelite.api.events.GroundObjectSpawned;
 import net.runelite.api.events.NpcDespawned;
 import net.runelite.api.events.NpcSpawned;
-import net.runelite.api.events.WallObjectChanged;
-import net.runelite.api.events.WallObjectDespawned;
-import net.runelite.api.events.WallObjectSpawned;
+import net.runelite.api.events.VarbitChanged;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.game.SkillIconManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
@@ -64,29 +57,32 @@ import java.util.Set;
 
 public class GauntletPlugin extends Plugin {
 
-    @Getter
-    private BufferedImage CRYSTAL_DEPOSIT;
+    public BufferedImage imageCrystalDeposit;
+    public BufferedImage imagePhrenRoots;
+    public BufferedImage imageFishingSpot;
+    public BufferedImage imageGrymRoot;
+    public BufferedImage imageLinumTirinum;
 
-    @Getter
-    private BufferedImage PHREN_ROOTS;
+    public BufferedImage imageAttackRange;
+    public BufferedImage imageAttackMage;
+    public BufferedImage imageAttackPrayer;
 
-    @Getter
-    private BufferedImage FISHING_SPOT;
+    public final Map<GameObject, Tile> resources = new HashMap<>();
 
-    @Getter
-    private BufferedImage GRYM_ROOT;
+    public Set<Projectile> projectiles = new HashSet<>();
 
-    @Getter
-    private BufferedImage LINUM_TIRINUM;
+    public int bossCounter = 0; // Attacks until the boss changes attack styles.
+    public BossAttackPhase currentPhase = BossAttackPhase.UNKNOWN;
 
-    @Getter
-    private BufferedImage ATTACK_RANGE;
+    public int playerCounter = 6; // Attacks until the boss changes prayer.
 
-    @Getter
-    private BufferedImage ATTACK_MAGE;
+    public enum BossAttackPhase {
+        MAGIC, RANGE, UNKNOWN;
+    }
 
-    @Getter
-    private BufferedImage ATTACK_PRAYER;
+    public enum BossAttack {
+        MAGIC, RANGE, PRAYER, LIGHTNING;
+    }
 
     @Inject
     private Client client;
@@ -99,148 +95,177 @@ public class GauntletPlugin extends Plugin {
     private GauntletOverlay overlay;
 
     @Inject
+    private SkillIconManager iconManager;
+
+    @Inject
     private GauntletConfig config;
-
-    @Getter
-    private final Map<TileObject, Tile> resources = new HashMap<>();
-
-    @Getter
-    private Set<Projectile> projectiles = new HashSet<>();
 
     @Provides
     GauntletConfig getConfig(ConfigManager configManager) {
         return configManager.getConfig(GauntletConfig.class);
     }
 
-    @Getter
-    @Setter
-    private int attacksLeft;
+    @Inject
+    private GauntletTimer timer;
 
-    @Getter
-    @Setter
-    private int playerCounter;
+    private boolean timerVisible = true;
 
-    @Getter
-    @Setter
-    private Style currentStyle;
-
-    public static enum Style {
-        MAGIC, RANGE, UNKNOWN;
-    }
-
-    public static enum Attack {
-        MAGIC, RANGE, PRAYER, LIGHTNING;
-    }
+    public boolean tornadoesActive = false;
+    public int tornadoTicks = GauntletUtils.TORNADO_TICKS;
 
     @Override
     protected void startUp() {
-        CRYSTAL_DEPOSIT = ImageUtil.getResourceStreamFromClass(getClass(), "/skill_icons/mining.png");
-        PHREN_ROOTS = ImageUtil.getResourceStreamFromClass(getClass(), "/skill_icons/woodcutting.png");
-        FISHING_SPOT = ImageUtil.getResourceStreamFromClass(getClass(), "/skill_icons/fishing.png");
-        GRYM_ROOT = ImageUtil.getResourceStreamFromClass(getClass(), "/skill_icons/herblore.png");
-        LINUM_TIRINUM = ImageUtil.getResourceStreamFromClass(getClass(), "/skill_icons/farming.png");
+        loadImages(config.iconSize());
 
-        ATTACK_MAGE = ImageUtil.getResourceStreamFromClass(getClass(), "/skill_icons/magic.png");
-        ATTACK_RANGE = ImageUtil.getResourceStreamFromClass(getClass(), "/skill_icons/ranged.png");
-        ATTACK_PRAYER = ImageUtil.getResourceStreamFromClass(getClass(), "/skill_icons/prayer.png");
+        resetCounters();
 
-        playerCounter = 6;
-        attacksLeft = 0;
-        currentStyle = Style.UNKNOWN;
-        projectiles.clear();
+        timerVisible = config.displayTimerWidget();
+        timer.resetStates();
+        timer.initStates();
+
+        if (timerVisible) {
+            overlayManager.add(timer);
+        }
 
         overlayManager.add(overlay);
     }
 
     @Override
     protected void shutDown() {
-        playerCounter = 6;
-        attacksLeft = 0;
-        currentStyle = Style.UNKNOWN;
-        projectiles.clear();
+        resetCounters();
+        timer.resetStates();
+
+        if (timerVisible) {
+            overlayManager.remove(timer);
+            timerVisible = false;
+        }
 
         overlayManager.remove(overlay);
+    }
 
-        CRYSTAL_DEPOSIT = null;
-        PHREN_ROOTS = null;
-        FISHING_SPOT = null;
-        GRYM_ROOT = null;
-        LINUM_TIRINUM = null;
+    /**
+     * Called when images need to be resized.
+     */
+    private void loadImages(int imageSize) {
+        imageCrystalDeposit = ImageUtil.resizeImage(iconManager.getSkillImage(Skill.MINING, true), imageSize, imageSize);
+        imagePhrenRoots = ImageUtil.resizeImage(iconManager.getSkillImage(Skill.WOODCUTTING, true), imageSize, imageSize);
+        imageFishingSpot = ImageUtil.resizeImage(iconManager.getSkillImage(Skill.FISHING, true), imageSize, imageSize);
+        imageGrymRoot = ImageUtil.resizeImage(iconManager.getSkillImage(Skill.HERBLORE, true), imageSize, imageSize);
+        imageLinumTirinum = ImageUtil.resizeImage(iconManager.getSkillImage(Skill.FARMING, true), imageSize, imageSize);
 
-        ATTACK_MAGE = null;
-        ATTACK_RANGE = null;
-        ATTACK_PRAYER = null;
+        imageAttackMage = ImageUtil.resizeImage(iconManager.getSkillImage(Skill.MAGIC, true), imageSize, imageSize);
+        imageAttackRange = ImageUtil.resizeImage(iconManager.getSkillImage(Skill.RANGED, true), imageSize, imageSize);
+        imageAttackPrayer = ImageUtil.resizeImage(iconManager.getSkillImage(Skill.PRAYER, true), imageSize, imageSize);
+    }
+
+    @Subscribe
+    public void onConfigChanged(ConfigChanged event) {
+        if (event.getGroup() == null || event.getKey() == null || !event.getGroup().equals("Gauntlet"))
+            return;
+
+        if (event.getKey().equals("displayTimerWidget")) {
+            if (config.displayTimerWidget() && !timerVisible) {
+                overlayManager.add(timer);
+                timerVisible = true;
+            } else if (!config.displayTimerWidget() && timerVisible) {
+                overlayManager.remove(timer);
+                timerVisible = false;
+            }
+        } else if (event.getKey().equals("iconSize")) {
+            loadImages(config.iconSize());
+        }
+    }
+
+    @Subscribe
+    public void onVarbitChanged(VarbitChanged event) {
+        // This handles the timer based on varp states.
+        timer.checkStates(true);
     }
 
     @Subscribe
     public void onNpcSpawned(NpcSpawned event) {
         NPC npc = event.getNpc();
-        if (npc == null || npc.getName() == null || !npc.getName().matches("(Crystalline|Corrupted) Hunllef"))
-            return;
-
-        playerCounter = 6;
-        attacksLeft = 0;
-        currentStyle = Style.UNKNOWN;
-        projectiles.clear();
+        if (GauntletUtils.isBoss(npc))
+            resetCounters();
     }
 
     @Subscribe
     public void onNpcDespawned(NpcDespawned event) {
         NPC npc = event.getNpc();
-        if (npc == null || npc.getName() == null || !npc.getName().matches("(Crystalline|Corrupted) Hunllef"))
-            return;
+        if (GauntletUtils.isBoss(npc))
+            resetCounters();
+    }
+
+    /**
+     * Reset all boss and player related counter resources.
+     */
+    private void resetCounters() {
+        bossCounter = 0;
+        currentPhase = BossAttackPhase.UNKNOWN;
 
         playerCounter = 6;
-        attacksLeft = 0;
-        currentStyle = Style.UNKNOWN;
+
+        tornadoesActive = false;
+        tornadoTicks = GauntletUtils.TORNADO_TICKS;
+
         projectiles.clear();
     }
 
-    public void doAttack(Attack style) {
-        if (style == Attack.PRAYER) {
-            if (config.alertPrayerDrain()) {
-                client.playSoundEffect(SoundEffectID.MAGIC_SPLASH_BOING, SoundEffectVolume.MEDIUM_HIGH);
+    /**
+     * Method is called when an attack is performed by the boss.
+     *
+     * @param style BossAttack ; the attack performed by the boss
+     */
+    public void doAttack(BossAttack style) {
+        // Prayer attacks are magic related. We only care if it's prayer to play the unique sound.
+        // This section will change all PRAYER attacks to MAGIC.
+        if (style == BossAttack.PRAYER) {
+            if (config.uniquePrayerAudio()) {
+                client.playSoundEffect(SoundEffectID.MAGIC_SPLASH_BOING);
             }
-            style = Attack.MAGIC;
+
+            style = BossAttack.MAGIC;
         }
 
-        if (style == Attack.LIGHTNING) {
-            attacksLeft--;
-        } else if (style == Attack.RANGE) {
-            if (currentStyle != Style.RANGE) {
-                currentStyle = Style.RANGE;
-                attacksLeft = 3;
+        // This section will decrement the boss attack counter by 1.
+        if (style == BossAttack.LIGHTNING) {
+            bossCounter--;
+        } else if (style == BossAttack.RANGE) {
+            if (currentPhase != BossAttackPhase.RANGE) {
+                currentPhase = BossAttackPhase.RANGE;
+                bossCounter = 3;
             } else {
-                attacksLeft--;
+                bossCounter--;
             }
-        } else if (style == Attack.MAGIC) {
-            if (currentStyle != Style.MAGIC) {
-                currentStyle = Style.MAGIC;
-                attacksLeft = 3;
+        } else if (style == BossAttack.MAGIC) {
+            if (currentPhase != BossAttackPhase.MAGIC) {
+                currentPhase = BossAttackPhase.MAGIC;
+                bossCounter = 3;
             } else {
-                attacksLeft--;
+                bossCounter--;
             }
         }
 
-        if (attacksLeft <= 0) {
-            Style newStyle;
+        // This section will reset the boss attack counter if necessary.
+        if (bossCounter <= 0) {
+            BossAttackPhase nextPhase;
 
-            switch (currentStyle) {
+            switch (currentPhase) {
                 case MAGIC:
-                    attacksLeft = 4;
-                    newStyle = Style.RANGE;
+                    bossCounter = 4;
+                    nextPhase = BossAttackPhase.RANGE;
                     break;
                 case RANGE:
-                    attacksLeft = 4;
-                    newStyle = Style.MAGIC;
+                    bossCounter = 4;
+                    nextPhase = BossAttackPhase.MAGIC;
                     break;
                 default:
-                    attacksLeft = 0;
-                    newStyle = Style.UNKNOWN;
+                    bossCounter = 0;
+                    nextPhase = BossAttackPhase.UNKNOWN;
                     break;
             }
 
-            currentStyle = newStyle;
+            currentPhase = nextPhase;
         }
     }
 
@@ -248,49 +273,30 @@ public class GauntletPlugin extends Plugin {
     public void onAnimationChanged(AnimationChanged event) {
         Actor actor = event.getActor();
 
-        if (actor instanceof Player && this.inBoss()) {
+        // This section handles the player counter.
+        if (actor instanceof Player && GauntletUtils.inBoss(client)) {
             Player p = (Player) actor;
             if (p.getName().equals(client.getLocalPlayer().getName())) {
                 int id = p.getAnimation();
                 if (id != -1) {
-                    int[] all_styles = new int[]{395, 401, 400, 401, 386, 390, 422, 423, 401, 428, 440, 426, 1167};
+                    // Detect the overhead prayer that the boss is using and determine the list of animations that the boss is currently immune to.
                     int[] wrong_style = new int[]{};
 
                     for (NPC npc : this.client.getNpcs()) {
-                        if (npc != null && npc.getName() != null && npc.getName().matches("(Crystalline|Corrupted) Hunllef")) {
+                        if (GauntletUtils.isBoss(npc)) {
                             NPCComposition comp = npc.getComposition();
                             if (comp != null) {
                                 HeadIcon prayer = comp.getOverheadIcon();
                                 if (prayer != null) {
                                     switch (prayer) {
                                         case MELEE:
-                                            wrong_style = new int[]{
-                                                    395, // Axe Slash
-                                                    401, // Axe Crush
-
-                                                    400, // Pick Crush
-                                                    401, // Pick Stab
-
-                                                    386, // Harpoon Stab
-                                                    390, // Harpoon Slash
-
-                                                    422, // Unarmed Punch
-                                                    423, // Unarmed Kick
-
-                                                    401, // Crystal Scepter
-                                                    428, // Crystal Halberd Jab & Fend
-                                                    440 // Crystal Halberd Swipe
-                                            };
+                                            wrong_style = GauntletUtils.MELEE_ANIMATIONS;
                                             break;
                                         case RANGED:
-                                            wrong_style = new int[]{
-                                                    426 // Crystal Bow
-                                            };
+                                            wrong_style = GauntletUtils.RANGE_ANIMATIONS;
                                             break;
                                         case MAGIC:
-                                            wrong_style = new int[]{
-                                                    1167 // Crystal Staff
-                                            };
+                                            wrong_style = GauntletUtils.MAGE_ANIMATIONS;
                                             break;
                                         default:
                                             wrong_style = new int[]{};
@@ -303,32 +309,25 @@ public class GauntletPlugin extends Plugin {
                         }
                     }
 
-                    outerloop:
-                    for (int action : all_styles) {
-                        if (action == id) {
-                            for (int wrong_action : wrong_style) {
-                                if (action == wrong_action)
-                                    break outerloop;
-                            }
-
-                            playerCounter--;
-                            if (playerCounter <= 0) {
-                                playerCounter = 6;
-                            }
-
-                            break outerloop;
+                    // Check that the player performed an attack animation that the boss isn't immune to.
+                    if (GauntletUtils.arrayContainsInteger(GauntletUtils.PLAYER_ANIMATIONS, id) && !GauntletUtils.arrayContainsInteger(wrong_style, id)) {
+                        // Attack is valid. Decrement the player attack counter and reset it if necessary.
+                        playerCounter--;
+                        if (playerCounter <= 0) {
+                            playerCounter = 6;
                         }
                     }
                 }
             }
         }
 
+        // This section handles the boss attack counter if they perform a lightning attack.
         if (actor instanceof NPC) {
             NPC npc = (NPC) actor;
-            if (npc != null && npc.getName() != null && npc.getName().matches("(Crystalline|Corrupted) Hunllef")) {
+            if (GauntletUtils.isBoss(npc)) {
                 int id = npc.getAnimation();
-                if (id == 8418) {
-                    this.doAttack(Attack.LIGHTNING);
+                if (id == GauntletUtils.BOSS_ANIMATION_LIGHTNING) {
+                    this.doAttack(BossAttack.LIGHTNING);
                 }
             }
         }
@@ -336,86 +335,62 @@ public class GauntletPlugin extends Plugin {
 
     @Subscribe
     public void onGameTick(GameTick event) {
+        // This handles the timer based on player health.
+        timer.checkStates(false);
+
+        // This section handles the boss attack counter if they perform a projectile attack.
         Set<Projectile> newProjectiles = new HashSet<>();
+
         for (Projectile projectile : client.getProjectiles()) {
             newProjectiles.add(projectile);
 
             if (!projectiles.contains(projectile)) {
                 int id = projectile.getId();
-                if (id == 1707 || id == 1708) {
-                    this.doAttack(Attack.MAGIC);
-                } else if (id == 1713 || id == 1714) {
-                    this.doAttack(Attack.PRAYER);
-                } else if (id == 1711 || id == 1712) {
-                    this.doAttack(Attack.RANGE);
+                if (GauntletUtils.arrayContainsInteger(GauntletUtils.PROJECTILE_MAGIC, id)) {
+                    this.doAttack(BossAttack.MAGIC);
+                } else if (GauntletUtils.arrayContainsInteger(GauntletUtils.PROJECTILE_PRAYER, id)) {
+                    this.doAttack(BossAttack.PRAYER);
+                } else if (GauntletUtils.arrayContainsInteger(GauntletUtils.PROJECTILE_RANGE, id)) {
+                    this.doAttack(BossAttack.RANGE);
                 }
             }
         }
 
         projectiles.clear();
         projectiles = newProjectiles;
+
+        // This section handles lightning decay.
+        if (!this.tornadoesActive) {
+            for (NPC npc : client.getNpcs()) {
+                if (GauntletUtils.isTornado(npc)) {
+                    tornadoesActive = true;
+                    tornadoTicks = GauntletUtils.TORNADO_TICKS;
+                    break;
+                }
+            }
+        } else {
+            tornadoTicks--;
+            if (tornadoTicks <= 0) {
+                tornadoesActive = false;
+                tornadoTicks = GauntletUtils.TORNADO_TICKS;
+            }
+        }
     }
 
     @Subscribe
     public void onGameObjectSpawned(GameObjectSpawned event) {
-        onTileObject(event.getTile(), null, event.getGameObject());
+        onGameObject(event.getTile(), null, event.getGameObject());
     }
 
     @Subscribe
     public void onGameObjectChanged(GameObjectChanged event) {
-        onTileObject(event.getTile(), event.getPrevious(), event.getGameObject());
+        onGameObject(event.getTile(), event.getPrevious(), event.getGameObject());
     }
 
     @Subscribe
     public void onGameObjectDespawned(GameObjectDespawned event) {
-        onTileObject(event.getTile(), event.getGameObject(), null);
+        onGameObject(event.getTile(), event.getGameObject(), null);
     }
-
-    @Subscribe
-    public void onGroundObjectSpawned(GroundObjectSpawned event) {
-        onTileObject(event.getTile(), null, event.getGroundObject());
-    }
-
-    @Subscribe
-    public void onGroundObjectChanged(GroundObjectChanged event) {
-        onTileObject(event.getTile(), event.getPrevious(), event.getGroundObject());
-    }
-
-    @Subscribe
-    public void onGroundObjectDespawned(GroundObjectDespawned event) {
-        onTileObject(event.getTile(), event.getGroundObject(), null);
-    }
-
-    @Subscribe
-    public void onWallObjectSpawned(WallObjectSpawned event) {
-        onTileObject(event.getTile(), null, event.getWallObject());
-    }
-
-    @Subscribe
-    public void onWallObjectChanged(WallObjectChanged event) {
-        onTileObject(event.getTile(), event.getPrevious(), event.getWallObject());
-    }
-
-    @Subscribe
-    public void onWallObjectDespawned(WallObjectDespawned event) {
-        onTileObject(event.getTile(), event.getWallObject(), null);
-    }
-
-    @Subscribe
-    public void onDecorativeObjectSpawned(DecorativeObjectSpawned event) {
-        onTileObject(event.getTile(), null, event.getDecorativeObject());
-    }
-
-    @Subscribe
-    public void onDecorativeObjectChanged(DecorativeObjectChanged event) {
-        onTileObject(event.getTile(), event.getPrevious(), event.getDecorativeObject());
-    }
-
-    @Subscribe
-    public void onDecorativeObjectDespawned(DecorativeObjectDespawned event) {
-        onTileObject(event.getTile(), event.getDecorativeObject(), null);
-    }
-
 
     @Subscribe
     public void onGameStateChanged(GameStateChanged event) {
@@ -424,7 +399,14 @@ public class GauntletPlugin extends Plugin {
         }
     }
 
-    private void onTileObject(Tile tile, TileObject oldObject, TileObject newObject) {
+    /**
+     * Called when a GameObject spawns, changes, or despawns.
+     *
+     * @param tile      Tile
+     * @param oldObject TileObject
+     * @param newObject TileObject
+     */
+    private void onGameObject(Tile tile, GameObject oldObject, GameObject newObject) {
         resources.remove(oldObject);
 
         if (newObject == null) {
@@ -433,27 +415,8 @@ public class GauntletPlugin extends Plugin {
 
         int id = newObject.getId();
 
-        int[] ids = {
-                36068, // Fishing Spot (Harpoon)
-                35967,
-                36066, // Phren Roots (Axe)
-                35969,
-                36070, // Grym Root
-                35971,
-                36072, // Linum Tirinum
-                35973,
-                36064, // Crystal Deposit
-                35975
-        };
-
-        for (int i : ids) {
-            if (i == id) {
-                resources.put(newObject, tile);
-            }
+        if (GauntletUtils.arrayContainsInteger(GauntletUtils.RESOURCE_IDS, id)) {
+            resources.put(newObject, tile);
         }
-    }
-
-    public boolean inBoss() {
-        return client.getVarbitValue(client.getVarps(), 9177) == 1;
     }
 }
