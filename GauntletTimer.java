@@ -208,7 +208,7 @@ class GauntletTimer extends Overlay {
 
         panelComponent.getChildren().add(TitleComponent.builder().text("Gauntlet Timer").color(Color.WHITE).build());
 
-        if(timeRaidStart == -1L) { // User restarted the plugin mid raid. Timer is inaccurate.
+        if (timeRaidStart == -1L) { // User restarted the plugin mid raid. Timer is inaccurate.
             panelComponent.getChildren().add(LineComponent.builder().left("Inactive").right("0:00").build());
         } else {
             String elapsedPrepTime, elapsedBossTime, elapsedTotalTime;

@@ -1,8 +1,18 @@
 package net.runelite.client.plugins.gauntlet;
 
 import net.runelite.api.Client;
+import net.runelite.api.Model;
 import net.runelite.api.NPC;
-import net.runelite.api.Varbits;
+import net.runelite.api.Perspective;
+import net.runelite.api.Point;
+import net.runelite.api.Projectile;
+import net.runelite.api.coords.LocalPoint;
+import net.runelite.api.model.Jarvis;
+import net.runelite.api.model.Vertex;
+
+import java.awt.*;
+import java.util.ArrayList;
+import java.util.List;
 
 public class GauntletUtils {
 
@@ -158,5 +168,35 @@ public class GauntletUtils {
         } catch (IndexOutOfBoundsException | NullPointerException ignored) {
             return false;
         }
+    }
+
+    public static Polygon boundProjectile(Client client, Projectile p) {
+        if (p == null || p.getModel() == null)
+            return null;
+
+        Model model = p.getModel();
+        LocalPoint point = new LocalPoint((int) p.getX(), (int) p.getY());
+        int tileHeight = Perspective.getTileHeight(client, point, client.getPlane());
+
+        List<Vertex> vertices = model.getVertices();
+        List<Point> list = new ArrayList<>();
+
+        for (final Vertex vertex : vertices) {
+            final Point localToCanvas = Perspective.localToCanvas(client, point.getX() - vertex.getX(), point.getY() - vertex.getZ(), tileHeight + vertex.getY() + (int) p.getZ());
+            if (localToCanvas != null) {
+                list.add(localToCanvas);
+            }
+        }
+
+        final List<Point> convexHull = Jarvis.convexHull(list);
+        if (convexHull == null)
+            return null;
+
+        final Polygon polygon = new Polygon();
+        for (final Point hullPoint : convexHull) {
+            polygon.addPoint(hullPoint.getX(), hullPoint.getY());
+        }
+
+        return polygon;
     }
 }

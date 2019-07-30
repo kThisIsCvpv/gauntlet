@@ -9,14 +9,13 @@
 package net.runelite.client.plugins.gauntlet;
 
 import net.runelite.api.Client;
+import net.runelite.api.GameObject;
 import net.runelite.api.NPC;
 import net.runelite.api.Perspective;
 import net.runelite.api.Point;
 import net.runelite.api.Projectile;
 import net.runelite.api.Tile;
-import net.runelite.api.TileObject;
 import net.runelite.api.coords.LocalPoint;
-import net.runelite.api.coords.WorldPoint;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPosition;
@@ -58,27 +57,45 @@ public class GauntletOverlay extends Overlay {
                 int id = projectile.getId();
 
                 BufferedImage icon = null;
+                Color color = null;
 
-                if (GauntletUtils.arrayContainsInteger(GauntletUtils.PROJECTILE_MAGIC, id) && config.uniqueAttackVisual())
+                if (GauntletUtils.arrayContainsInteger(GauntletUtils.PROJECTILE_MAGIC, id) && config.uniqueAttackVisual()) {
                     icon = plugin.imageAttackMage;
-                else if (GauntletUtils.arrayContainsInteger(GauntletUtils.PROJECTILE_RANGE, id) && config.uniqueAttackVisual())
+                    color = Color.CYAN;
+                } else if (GauntletUtils.arrayContainsInteger(GauntletUtils.PROJECTILE_RANGE, id) && config.uniqueAttackVisual()) {
                     icon = plugin.imageAttackRange;
-                else if (GauntletUtils.arrayContainsInteger(GauntletUtils.PROJECTILE_PRAYER, id) && config.uniquePrayerVisual())
+                    color = Color.GREEN;
+                } else if (GauntletUtils.arrayContainsInteger(GauntletUtils.PROJECTILE_PRAYER, id) && config.uniquePrayerVisual()) {
                     icon = plugin.imageAttackPrayer;
+                    color = Color.MAGENTA;
+                }
 
                 if (icon == null)
                     continue;
 
-                int x = (int) projectile.getX();
-                int y = (int) projectile.getY();
+                Polygon polygon = GauntletUtils.boundProjectile(client, projectile);
+                if (polygon == null) {
+                    int x = (int) projectile.getX();
+                    int y = (int) projectile.getY();
 
-                LocalPoint point = new LocalPoint(x, y);
-                Point loc = Perspective.getCanvasImageLocation(client, point, icon, 0);
+                    LocalPoint point = new LocalPoint(x, y);
+                    Point loc = Perspective.getCanvasImageLocation(client, point, icon, -(int) projectile.getZ());
 
-                if (loc == null)
-                    continue;
+                    if (loc == null)
+                        continue;
 
-                graphics.drawImage(icon, loc.getX(), loc.getY(), null);
+                    graphics.drawImage(icon, loc.getX(), loc.getY(), null);
+                } else {
+                    graphics.setColor(color);
+                    graphics.draw(polygon);
+                    graphics.setColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), 50));
+                    graphics.fill(polygon);
+
+                    Rectangle bounds = polygon.getBounds();
+                    int x = (int) bounds.getCenterX() - (icon.getWidth() / 2);
+                    int y = (int) bounds.getCenterY() - (icon.getHeight() / 2);
+                    graphics.drawImage(icon, x, y, null);
+                }
             }
 
             for (NPC npc : this.client.getNpcs()) {
@@ -143,7 +160,6 @@ public class GauntletOverlay extends Overlay {
                                 attackIcon = plugin.imageAttackRange;
                                 break;
                             default:
-                                attackIcon = null;
                                 break;
                         }
 
@@ -158,7 +174,7 @@ public class GauntletOverlay extends Overlay {
                     }
 
                     // This section handles any text overlays.
-                    String textOverlay = new String();
+                    String textOverlay = "";
 
                     // Handles the counter for the boss.
                     if (config.countBossAttacks()) {
@@ -197,12 +213,12 @@ public class GauntletOverlay extends Overlay {
             // This section overlays all resources.
             LocalPoint playerLocation = client.getLocalPlayer().getLocalLocation();
 
-            for (TileObject object : plugin.resources.keySet()) {
+            for (GameObject object : plugin.resources.keySet()) {
                 Tile tile = plugin.resources.get(object);
                 if (tile.getPlane() == client.getPlane()
                         && object.getLocalLocation().distanceTo(playerLocation) < MAX_DISTANCE) {
 
-                    // Don't use Convex Hull Clickbox. As the room start to fill up, your FPS will dip.
+                    // Don't use Convex Hull click box. As the room start to fill up, your FPS will dip.
                     Polygon polygon = object.getCanvasTilePoly();
 
                     if (polygon != null) {
