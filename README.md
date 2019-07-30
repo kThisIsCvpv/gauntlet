@@ -51,12 +51,12 @@ Plays a unique sound whenever the boss is about to shut down your prayer.
 ## Unique Prayer Visual: 
 Prayer attacks will have a unique overlay visual.
 
-![alt text](https://www.kthisiscvpv.com/Irprn1564448139Vaxsp.png)
+![alt text](https://www.kthisiscvpv.com/i4u1q1564459714EcXwr.png)
 
 ## Unique Magic & Range Visuals: 
 Magic and Range attacks will have a unique overlay visual.
 
-![alt text](https://www.kthisiscvpv.com/Ws1yX1564448168Eympq.png)
+![alt text](https://www.kthisiscvpv.com/eIbJs1564459764Ek5Am.png)
 
 ## Overlay the Boss (Color): 
 Overlay the boss with an color denoting it's current attack style.
