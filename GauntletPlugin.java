@@ -33,6 +33,7 @@ import net.runelite.api.events.GameTick;
 import net.runelite.api.events.NpcDespawned;
 import net.runelite.api.events.NpcSpawned;
 import net.runelite.api.events.VarbitChanged;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.game.SkillIconManager;
@@ -87,6 +88,9 @@ public class GauntletPlugin extends Plugin {
     @Inject
     private Client client;
 
+    @Inject
+    private ClientThread clientThread;
+
     @Getter(AccessLevel.PUBLIC)
     @Inject
     private OverlayManager overlayManager;
@@ -113,6 +117,8 @@ public class GauntletPlugin extends Plugin {
     public boolean tornadoesActive = false;
     public int tornadoTicks = GauntletUtils.TORNADO_TICKS;
 
+    public boolean completeStartup = false;
+
     @Override
     protected void startUp() {
         loadImages(config.iconSize());
@@ -121,13 +127,25 @@ public class GauntletPlugin extends Plugin {
 
         timerVisible = config.displayTimerWidget();
         timer.resetStates();
-        timer.initStates();
 
         if (timerVisible) {
             overlayManager.add(timer);
         }
 
         overlayManager.add(overlay);
+
+        // This section checks if the user is trying to start the timer while mid-raid.
+        // Varbits can only be checked on the client thread. Perform init check if nessessary.
+        if (client.getGameState() != GameState.STARTING && client.getGameState() != GameState.UNKNOWN) {
+            completeStartup = false;
+            clientThread.invoke(new Runnable() {
+                public void run() {
+                    timer.initStates();
+                    completeStartup = true;
+                }
+            });
+        } else
+            completeStartup = true;
     }
 
     @Override
@@ -179,7 +197,8 @@ public class GauntletPlugin extends Plugin {
     @Subscribe
     public void onVarbitChanged(VarbitChanged event) {
         // This handles the timer based on varp states.
-        timer.checkStates(true);
+        if (this.completeStartup)
+            timer.checkStates(true);
     }
 
     @Subscribe
@@ -336,7 +355,8 @@ public class GauntletPlugin extends Plugin {
     @Subscribe
     public void onGameTick(GameTick event) {
         // This handles the timer based on player health.
-        timer.checkStates(false);
+        if (this.completeStartup)
+            timer.checkStates(false);
 
         // This section handles the boss attack counter if they perform a projectile attack.
         Set<Projectile> newProjectiles = new HashSet<>();

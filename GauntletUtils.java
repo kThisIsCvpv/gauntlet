@@ -141,7 +141,7 @@ public class GauntletUtils {
     public static boolean inRaid(Client client) {
         try {
             return client.getVarbitValue(client.getVarps(), VARP_RAID_ROOM) == 1;
-        } catch (IndexOutOfBoundsException ignore) {
+        } catch (IndexOutOfBoundsException | NullPointerException ignored) {
             return false;
         }
     }
@@ -155,7 +155,7 @@ public class GauntletUtils {
     public static boolean inBoss(Client client) {
         try {
             return client.getVarbitValue(client.getVarps(), VARP_BOSS_ROOM) == 1;
-        } catch (IndexOutOfBoundsException ignore) {
+        } catch (IndexOutOfBoundsException | NullPointerException ignored) {
             return false;
         }
     }

@@ -26,7 +26,6 @@ package net.runelite.client.plugins.gauntlet;
 
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
-import net.runelite.api.GameState;
 import net.runelite.api.Player;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayMenuEntry;
@@ -79,16 +78,16 @@ class GauntletTimer extends Overlay {
      * Good luck to you. If you restart plugin mid raid, oh well. Your timer's going to be inaccurate.
      */
     public void initStates() {
-//        timeRaidStart = -1L;
-//        timeBossEnter = -1L;
-//
-//        if (GauntletUtils.inRaid(client)) {
-//            currentState = RaidState.IN_RAID;
-//            if (GauntletUtils.inBoss(client)) {
-//                currentState = RaidState.IN_BOSS;
-//            }
-//        } else
-//            currentState = RaidState.UNKNOWN;
+        timeRaidStart = -1L;
+        timeBossEnter = -1L;
+
+        if (GauntletUtils.inRaid(client)) {
+            currentState = RaidState.IN_RAID;
+            if (GauntletUtils.inBoss(client)) {
+                currentState = RaidState.IN_BOSS;
+            }
+        } else
+            currentState = RaidState.UNKNOWN;
     }
 
     /**
@@ -125,7 +124,7 @@ class GauntletTimer extends Overlay {
     public void checkStates(boolean checkVarps) {
         final Player p = client.getLocalPlayer();
 
-        if (p == null)
+        if (p == null || !plugin.completeStartup)
             return;
 
         if (checkVarps) {
@@ -201,7 +200,7 @@ class GauntletTimer extends Overlay {
 
     @Override
     public Dimension render(Graphics2D graphics) {
-        if (currentState == RaidState.UNKNOWN || timeRaidStart == -1L) {
+        if (currentState == RaidState.UNKNOWN) {
             return null;
         }
 
@@ -209,20 +208,24 @@ class GauntletTimer extends Overlay {
 
         panelComponent.getChildren().add(TitleComponent.builder().text("Gauntlet Timer").color(Color.WHITE).build());
 
-        String elapsedPrepTime, elapsedBossTime, elapsedTotalTime;
-        elapsedTotalTime = calculateElapsedTime(System.currentTimeMillis(), timeRaidStart);
-
-        if (currentState == RaidState.IN_RAID) {
-            elapsedPrepTime = calculateElapsedTime(timeRaidStart, System.currentTimeMillis());
-            elapsedBossTime = "0:00";
+        if(timeRaidStart == -1L) { // User restarted the plugin mid raid. Timer is inaccurate.
+            panelComponent.getChildren().add(LineComponent.builder().left("Inactive").right("0:00").build());
         } else {
-            elapsedPrepTime = calculateElapsedTime(timeRaidStart, timeBossEnter);
-            elapsedBossTime = calculateElapsedTime(System.currentTimeMillis(), timeBossEnter);
-        }
+            String elapsedPrepTime, elapsedBossTime, elapsedTotalTime;
+            elapsedTotalTime = calculateElapsedTime(System.currentTimeMillis(), timeRaidStart);
 
-        panelComponent.getChildren().add(LineComponent.builder().left("Preparation").right(elapsedPrepTime).build());
-        panelComponent.getChildren().add(LineComponent.builder().left("Boss Fight").right(elapsedBossTime).build());
-        panelComponent.getChildren().add(LineComponent.builder().left("Total Time").right(elapsedTotalTime).build());
+            if (currentState == RaidState.IN_RAID) {
+                elapsedPrepTime = calculateElapsedTime(timeRaidStart, System.currentTimeMillis());
+                elapsedBossTime = "0:00";
+            } else {
+                elapsedPrepTime = calculateElapsedTime(timeRaidStart, timeBossEnter);
+                elapsedBossTime = calculateElapsedTime(System.currentTimeMillis(), timeBossEnter);
+            }
+
+            panelComponent.getChildren().add(LineComponent.builder().left("Preparation").right(elapsedPrepTime).build());
+            panelComponent.getChildren().add(LineComponent.builder().left("Boss Fight").right(elapsedBossTime).build());
+            panelComponent.getChildren().add(LineComponent.builder().left("Total Time").right(elapsedTotalTime).build());
+        }
 
         return panelComponent.render(graphics);
     }
