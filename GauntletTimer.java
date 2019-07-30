@@ -72,20 +72,23 @@ class GauntletTimer extends Overlay {
 
     /**
      * This is called when the player resets the plugin mid-raid. We do not want to confuse the timer.
+     * <p>
+     * TODO: Originally, this function will disable the timer if the plugin is started mid raid.
+     * Unfortunately, VARBITS can't be checked unless you're on the client thread.
+     * I've no idea how to access RL's task handler.
+     * Good luck to you. If you restart plugin mid raid, oh well. Your timer's going to be inaccurate.
      */
     public void initStates() {
-        timeRaidStart = -1L;
-        timeBossEnter = -1L;
-
-        if (client.getGameState() != GameState.STARTING && client.getGameState() != GameState.UNKNOWN) {
-            if (GauntletUtils.inRaid(client)) {
-                currentState = RaidState.IN_RAID;
-                if (GauntletUtils.inBoss(client)) {
-                    currentState = RaidState.IN_BOSS;
-                }
-            } else
-                currentState = RaidState.UNKNOWN;
-        }
+//        timeRaidStart = -1L;
+//        timeBossEnter = -1L;
+//
+//        if (GauntletUtils.inRaid(client)) {
+//            currentState = RaidState.IN_RAID;
+//            if (GauntletUtils.inBoss(client)) {
+//                currentState = RaidState.IN_BOSS;
+//            }
+//        } else
+//            currentState = RaidState.UNKNOWN;
     }
 
     /**
@@ -122,13 +125,20 @@ class GauntletTimer extends Overlay {
     public void checkStates(boolean checkVarps) {
         final Player p = client.getLocalPlayer();
 
-        if(p == null)
+        if (p == null)
             return;
 
         if (checkVarps) {
-            if (currentState == RaidState.UNKNOWN && GauntletUtils.inRaid(client) && !GauntletUtils.inBoss(client) && p.getHealthRatio() != 0) { // Player has started a new raid.
-                currentState = RaidState.IN_RAID;
-                timeRaidStart = System.currentTimeMillis();
+            if (currentState == RaidState.UNKNOWN) {
+                if (GauntletUtils.inRaid(client) && p.getHealthRatio() != 0) { // Player has started a new raid.
+                    if (!GauntletUtils.inBoss(client)) {
+                        currentState = RaidState.IN_RAID;
+                        timeRaidStart = System.currentTimeMillis();
+                    } else {
+                        currentState = RaidState.IN_RAID;
+                        timeRaidStart = timeBossEnter = System.currentTimeMillis();
+                    }
+                }
             } else if (currentState == RaidState.IN_RAID) {
                 if (GauntletUtils.inRaid(client)) {
                     if (GauntletUtils.inBoss(client)) {  // Player has begun the boss fight.

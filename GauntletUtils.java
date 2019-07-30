@@ -2,6 +2,7 @@ package net.runelite.client.plugins.gauntlet;
 
 import net.runelite.api.Client;
 import net.runelite.api.NPC;
+import net.runelite.api.Varbits;
 
 public class GauntletUtils {
 
@@ -138,7 +139,11 @@ public class GauntletUtils {
      * @return boolean
      */
     public static boolean inRaid(Client client) {
-        return client.getVarbitValue(client.getVarps(), VARP_RAID_ROOM) == 1;
+        try {
+            return client.getVarbitValue(client.getVarps(), VARP_RAID_ROOM) == 1;
+        } catch (IndexOutOfBoundsException ignore) {
+            return false;
+        }
     }
 
     /**
@@ -148,6 +153,10 @@ public class GauntletUtils {
      * @return boolean
      */
     public static boolean inBoss(Client client) {
-        return client.getVarbitValue(client.getVarps(), VARP_BOSS_ROOM) == 1;
+        try {
+            return client.getVarbitValue(client.getVarps(), VARP_BOSS_ROOM) == 1;
+        } catch (IndexOutOfBoundsException ignore) {
+            return false;
+        }
     }
 }
