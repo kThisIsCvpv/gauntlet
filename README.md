@@ -9,8 +9,6 @@
 
 ## Major Changelog:
 ```
-July 27, 2019 - Initial Plugin Release
-
 July 29, 2019 - Plugin Overhaul
 + All configurations have become independant. You can disable one without affecting the other.
 + Prayer audio no longer ignores sound settings
@@ -19,6 +17,11 @@ July 29, 2019 - Plugin Overhaul
 + Boss attack style icon can be toggled.
 + Timer is now available.
 + Ability to change icon size
+
+July 27, 2019 - Initial Plugin Release
++ Boss Overlay
++ Boss & Player Counter
++ Resources Overlay
 ```
 
 ## Settings and Features:
