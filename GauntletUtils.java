@@ -178,7 +178,21 @@ public class GauntletUtils {
         LocalPoint point = new LocalPoint((int) p.getX(), (int) p.getY());
         int tileHeight = Perspective.getTileHeight(client, point, client.getPlane());
 
+        double angle = Math.atan(p.getVelocityY() / p.getVelocityX());
+        angle = Math.toDegrees(angle) + (p.getVelocityX() < 0 ? 180 : 0);
+        angle = angle < 0 ? angle + 360 : angle;
+        angle = 360 - angle - 90;
+
+        double ori = angle * (512d / 90d);
+        ori = ori < 0 ? ori + 2048 : ori;
+
+        int orientation = (int) Math.round(ori);
+
         List<Vertex> vertices = model.getVertices();
+        for (int i = 0; i < vertices.size(); ++i) {
+            vertices.set(i, vertices.get(i).rotate(orientation));
+        }
+
         List<Point> list = new ArrayList<>();
 
         for (final Vertex vertex : vertices) {
