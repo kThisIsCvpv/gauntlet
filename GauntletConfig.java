@@ -145,7 +145,7 @@ public interface GauntletConfig extends Config {
             position = 12,
             keyName = "iconSize",
             name = "Global Icon Size",
-            description = "Globally change the size of icons."
+            description = "Globally change the size of icons. { Range: 1 to 50 }"
     )
     default int iconSize() {
         return 20;
