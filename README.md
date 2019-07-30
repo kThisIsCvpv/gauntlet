@@ -41,7 +41,7 @@ Count the amount of attacks left until the boss changes their attack style.
 ## Count Player Attacks: 
 Count the amount of player attacks left until the boss changes their prayer.
 
-![alt text](https://www.kthisiscvpv.com/kCDGa1564447914IXMt7.png)
+![alt text](https://www.kthisiscvpv.com/46dC515644638509q6gV.png)
 
 ## Unique Prayer Audio: 
 Plays a unique sound whenever the boss is about to shut down your prayer.
@@ -51,12 +51,12 @@ Plays a unique sound whenever the boss is about to shut down your prayer.
 ## Unique Prayer Visual: 
 Prayer attacks will have a unique overlay visual.
 
-![alt text](https://www.kthisiscvpv.com/i4u1q1564459714EcXwr.png)
+![alt text](https://www.kthisiscvpv.com/64nol15644637343GmeX.png)
 
 ## Unique Magic & Range Visuals: 
 Magic and Range attacks will have a unique overlay visual.
 
-![alt text](https://www.kthisiscvpv.com/eIbJs1564459764Ek5Am.png)
+![alt text](https://www.kthisiscvpv.com/hrphS1564463651qNz2r.png)
 
 ## Overlay the Boss (Color): 
 Overlay the boss with an color denoting it's current attack style.
