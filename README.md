@@ -6,9 +6,9 @@ This plugin has beeen deprecated. The official RuneLite has stopped supporting t
 
 I recommend that you switch to OpenOSRS.
 
-OpenOSRS -> https://openosrs.com/
+**OpenOSRS** -> https://openosrs.com/
 
-Plugin Fork -> @xKylee https://github.com/xKylee/plugins-source
+**Plugin Fork** -> @xKylee https://github.com/xKylee/plugins-source
 
 ---
 
