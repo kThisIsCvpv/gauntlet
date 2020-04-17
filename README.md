@@ -1,4 +1,16 @@
 # RuneLite Gauntlet Plugin
+
+**Update:** April 17th 2020
+
+This plugin has beeen deprecated. The official RuneLite has stopped supporting the "Projectiles" class, one of the fundamental classes of this project.
+
+I recommend that you switch to OpenOSRS.
+
+OpenOSRS -> https://openosrs.com/
+Plugin Fork -> @xKylee https://github.com/xKylee/plugins-source
+
+---
+
 **Author:** Yuri-chan (Nagi#0001)
 
 **Last Updated:** July 30, 2019
